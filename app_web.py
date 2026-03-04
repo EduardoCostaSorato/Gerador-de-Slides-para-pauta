@@ -81,7 +81,7 @@ if arquivo:
             adicionar_texto(
                 slide,
                 "2ª Turma Cível",
-                Inches(4.5),
+                Inches(3.5),
                 Inches(1.15),
                 Inches(4),
                 18,
@@ -136,3 +136,4 @@ if arquivo:
             mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
 
         )
+

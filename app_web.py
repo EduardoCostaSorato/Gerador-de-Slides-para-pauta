@@ -9,7 +9,7 @@ from io import BytesIO
 
 st.set_page_config(page_title="Gerador de Slides para pauta", layout="centered")
 
-st.title("Gerador de Slides para pauta")
+st.title("Gerador de Slides para pauta da 2ª Turma Cível")
 st.write("Envie a planilha Excel para gerar os slides automaticamente")
 
 arquivo = st.file_uploader("Enviar Excel", type=["xlsx"])
@@ -136,4 +136,5 @@ if arquivo:
             mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
 
         )
+
 

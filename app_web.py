@@ -16,9 +16,9 @@ st.set_page_config(
 
 st.title("Gerador de Slides da Pauta")
 
-# ================================
+# ======================================
 # CONFIGURAÇÕES
-# ================================
+# ======================================
 
 st.subheader("Configurações")
 
@@ -48,9 +48,9 @@ substituicoes = {
 
 st.divider()
 
-# ================================
-# EXTRAIR DOCX
-# ================================
+# ======================================
+# FUNÇÃO EXTRAIR DOCX
+# ======================================
 
 def extrair_dados_docx(arquivo):
 
@@ -58,11 +58,13 @@ def extrair_dados_docx(arquivo):
 
     linhas = []
 
+    # ler parágrafos
     for p in doc.paragraphs:
         texto = p.text.strip()
         if texto:
             linhas.append(texto)
 
+    # ler tabelas
     for tabela in doc.tables:
         for row in tabela.rows:
             for cell in row.cells:
@@ -105,9 +107,9 @@ def extrair_dados_docx(arquivo):
 
     return pd.DataFrame(dados)
 
-# ================================
-# TEXTO SLIDE
-# ================================
+# ======================================
+# FUNÇÃO TEXTO SLIDE
+# ======================================
 
 def adicionar_texto(slide, texto, x, y, largura, tamanho, cor):
 
@@ -120,22 +122,25 @@ def adicionar_texto(slide, texto, x, y, largura, tamanho, cor):
     p.alignment = PP_ALIGN.CENTER
 
     run = p.add_run()
-    run.text = texto
+    run.text = str(texto)
 
     run.font.name = "Century Gothic"
     run.font.size = Pt(tamanho)
     run.font.bold = True
     run.font.color.rgb = cor
 
-# ================================
+# ======================================
 # UPLOAD DOCX
-# ================================
+# ======================================
 
-arquivo = st.file_uploader("Enviar DOCX da pauta", type=["docx"])
+arquivo = st.file_uploader(
+    "Enviar DOCX da pauta",
+    type=["docx"]
+)
 
-# ================================
+# ======================================
 # PROCESSAR
-# ================================
+# ======================================
 
 if arquivo:
 
@@ -158,6 +163,13 @@ if arquivo:
             )
         },
         use_container_width=True
+    )
+
+    st.divider()
+
+    nome_arquivo = st.text_input(
+        "Nome do arquivo PowerPoint",
+        value="slides_pauta"
     )
 
     if st.button("Gerar apresentação"):
@@ -259,6 +271,7 @@ if arquivo:
             prs.slides._sldIdLst.remove(prs.slides._sldIdLst[1])
 
         output = BytesIO()
+
         prs.save(output)
 
         st.success("Slides gerados!")
@@ -266,5 +279,5 @@ if arquivo:
         st.download_button(
             "Baixar PowerPoint",
             output.getvalue(),
-            file_name="slides_pauta.pptx"
+            file_name=f"{nome_arquivo}.pptx"
         )

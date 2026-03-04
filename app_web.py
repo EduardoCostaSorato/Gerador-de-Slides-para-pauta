@@ -52,7 +52,6 @@ if arquivo:
 
     st.success("Excel carregado com sucesso")
 
-    # Mostrar preview da planilha
     st.subheader("Pré-visualização da planilha")
     st.dataframe(df)
 
@@ -94,11 +93,14 @@ if arquivo:
 
         total = len(df)
 
+        # ================================
+        # GERAR SLIDES
+        # ================================
+
         for i, row in df.iterrows():
 
             slide = prs.slides.add_slide(layout)
 
-            # copiar imagem do modelo
             if img_ref:
 
                 img_stream = BytesIO(img_ref.image.blob)
@@ -111,7 +113,6 @@ if arquivo:
                     img_ref.height
                 )
 
-            # título
             adicionar_texto(
                 slide,
                 "2ª Turma Cível",
@@ -122,7 +123,6 @@ if arquivo:
                 RGBColor(255,255,255)
             )
 
-            # processo
             proc = str(row["processo"]).split(".8")[0]
 
             num = str(row["numero"]).replace(".0","").strip()
@@ -139,7 +139,6 @@ if arquivo:
                 RGBColor(0,0,0)
             )
 
-            # relator
             nome_original = str(row["desembargador"]).upper().strip()
 
             nome = substituicoes.get(nome_original, nome_original)
@@ -158,9 +157,18 @@ if arquivo:
 
             progress.progress((i+1)/total)
 
-        # remover slides extras
-        while len(prs.slides) > len(df):
-            prs.slides._sldIdLst.remove(prs.slides._sldIdLst[0])
+        # ================================
+        # REMOVER APENAS SLIDE MODELO
+        # ================================
+
+        slides_gerados = len(df)
+
+        while len(prs.slides) > slides_gerados + 1:
+            prs.slides._sldIdLst.remove(prs.slides._sldIdLst[1])
+
+        # ================================
+        # SALVAR
+        # ================================
 
         output = BytesIO()
         prs.save(output)

@@ -4,8 +4,10 @@ from pptx import Presentation
 from pptx.enum.text import PP_ALIGN
 from pptx.util import Pt, Inches
 from pptx.dml.color import RGBColor
+from docx import Document
 from io import BytesIO
 import os
+import re
 
 st.set_page_config(
     page_title="Gerador de Slides da Pauta",
@@ -14,9 +16,9 @@ st.set_page_config(
 
 st.title("Gerador de Slides da Pauta")
 
-# =====================================
-# CONFIGURAÇÕES EDITÁVEIS
-# =====================================
+# ================================
+# CONFIGURAÇÕES
+# ================================
 
 st.subheader("Configurações")
 
@@ -25,57 +27,87 @@ turma = st.text_input(
     value="2ª Turma Cível"
 )
 
-st.write("### Substituições de nomes")
+st.write("### Substituição de nomes dos desembargadores")
 
 col1, col2 = st.columns(2)
 
 with col1:
-    nome1 = st.text_input(
-        "JOAO EGMONT LEONCIO LOPES",
-        value="JOÃO EGMONT"
-    )
-
-    nome2 = st.text_input(
-        "HECTOR VALVERDE SANTANNA",
-        value="HÉCTOR VALVERDE"
-    )
+    nome1 = st.text_input("JOAO EGMONT LEONCIO LOPES","JOÃO EGMONT")
+    nome2 = st.text_input("HECTOR VALVERDE SANTANNA","HÉCTOR VALVERDE")
 
 with col2:
-    nome3 = st.text_input(
-        "RENATO RODOVALHO SCUSSEL",
-        value="RENATO SCUSSEL"
-    )
-
-    nome4 = st.text_input(
-        "FERNANDO ANTÔNIO TAVERNARD LIMA",
-        value="FERNANDO TAVERNARD"
-    )
-
-    nome5 = st.text_input(
-        "ALVARO CIARLINI",
-        value="ALVARO CIARLINI"
-    )
+    nome3 = st.text_input("RENATO RODOVALHO SCUSSEL","RENATO SCUSSEL")
+    nome4 = st.text_input("FERNANDO ANTÔNIO TAVERNARD LIMA","FERNANDO TAVERNARD")
 
 substituicoes = {
     "JOAO EGMONT LEONCIO LOPES": nome1,
     "HECTOR VALVERDE SANTANNA": nome2,
     "RENATO RODOVALHO SCUSSEL": nome3,
-    "FERNANDO ANTÔNIO TAVERNARD LIMA": nome4,
-    "ALVARO CIARLINI": nome5
+    "FERNANDO ANTÔNIO TAVERNARD LIMA": nome4
 }
 
 st.divider()
 
-# =====================================
-# UPLOAD
-# =====================================
+# ================================
+# EXTRAIR DOCX
+# ================================
 
-arquivo = st.file_uploader("Enviar Excel", type=["xlsx"])
+def extrair_dados_docx(arquivo):
 
+    doc = Document(arquivo)
 
-# =====================================
-# FUNÇÃO TEXTO
-# =====================================
+    linhas = []
+
+    for p in doc.paragraphs:
+        texto = p.text.strip()
+        if texto:
+            linhas.append(texto)
+
+    for tabela in doc.tables:
+        for row in tabela.rows:
+            for cell in row.cells:
+                texto = cell.text.strip()
+                if texto:
+                    linhas.append(texto)
+
+    dados = []
+
+    numero = None
+    processo = None
+    desembargador = None
+
+    for texto in linhas:
+
+        if re.fullmatch(r"\d+", texto):
+            numero = texto
+            continue
+
+        if re.search(r"\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}", texto):
+            processo = texto
+            continue
+
+        if texto.isupper() and len(texto) > 5:
+
+            desembargador = texto
+
+            if numero and processo:
+
+                dados.append({
+                    "numero": numero,
+                    "processo": processo,
+                    "desembargador": desembargador,
+                    "segredo": "NÃO"
+                })
+
+                numero = None
+                processo = None
+                desembargador = None
+
+    return pd.DataFrame(dados)
+
+# ================================
+# TEXTO SLIDE
+# ================================
 
 def adicionar_texto(slide, texto, x, y, largura, tamanho, cor):
 
@@ -88,42 +120,51 @@ def adicionar_texto(slide, texto, x, y, largura, tamanho, cor):
     p.alignment = PP_ALIGN.CENTER
 
     run = p.add_run()
-    run.text = str(texto)
+    run.text = texto
 
     run.font.name = "Century Gothic"
     run.font.size = Pt(tamanho)
     run.font.bold = True
     run.font.color.rgb = cor
 
+# ================================
+# UPLOAD DOCX
+# ================================
 
-# =====================================
-# PROCESSAR EXCEL
-# =====================================
+arquivo = st.file_uploader("Enviar DOCX da pauta", type=["docx"])
+
+# ================================
+# PROCESSAR
+# ================================
 
 if arquivo:
 
-    df = pd.read_excel(arquivo)
-    df.columns = df.columns.str.strip().str.lower()
+    df = extrair_dados_docx(arquivo)
 
-    st.success("Excel carregado")
-
-    st.subheader("Pré-visualização da planilha")
-    st.dataframe(df)
-
-    colunas_necessarias = {"numero","processo","desembargador"}
-
-    if not colunas_necessarias.issubset(df.columns):
-
-        st.error("A planilha precisa ter: numero, processo, desembargador")
+    if df.empty:
+        st.error("Nenhum processo foi encontrado no DOCX")
         st.stop()
+
+    st.success("Pauta extraída")
+
+    st.subheader("Editar pauta")
+
+    df_editado = st.data_editor(
+        df,
+        column_config={
+            "segredo": st.column_config.SelectboxColumn(
+                "Segredo",
+                options=["NÃO","SIM"]
+            )
+        },
+        use_container_width=True
+    )
 
     if st.button("Gerar apresentação"):
 
         if not os.path.exists("modelo.pptx"):
-            st.error("Arquivo modelo.pptx não encontrado")
+            st.error("modelo.pptx não encontrado")
             st.stop()
-
-        progress = st.progress(0)
 
         prs = Presentation("modelo.pptx")
 
@@ -139,9 +180,11 @@ if arquivo:
 
         layout = prs.slide_layouts[6]
 
-        total = len(df)
+        progress = st.progress(0)
 
-        for i, row in df.iterrows():
+        total = len(df_editado)
+
+        for i,row in df_editado.iterrows():
 
             slide = prs.slides.add_slide(layout)
 
@@ -157,7 +200,6 @@ if arquivo:
                     img_ref.height
                 )
 
-            # Nome da turma
             adicionar_texto(
                 slide,
                 turma,
@@ -168,12 +210,9 @@ if arquivo:
                 RGBColor(255,255,255)
             )
 
-            # Processo
             proc = str(row["processo"]).split(".8")[0]
 
-            num = str(row["numero"]).replace(".0","").strip()
-
-            texto = f"{proc} ({num})"
+            texto = f"{proc} ({row['numero']})"
 
             adicionar_texto(
                 slide,
@@ -185,9 +224,7 @@ if arquivo:
                 RGBColor(0,0,0)
             )
 
-            # Relator
             nome_original = str(row["desembargador"]).upper().strip()
-
             nome = substituicoes.get(nome_original, nome_original)
 
             relator = f"RELATOR:\nDESEMBARGADOR {nome}"
@@ -202,30 +239,21 @@ if arquivo:
                 RGBColor(0,0,0)
             )
 
-            # =====================================
-            # SEGREDO DE JUSTIÇA
-            # =====================================
+            if row["segredo"] == "SIM":
 
-            if "segredo" in df.columns:
-
-                segredo = str(row["segredo"]).upper().strip()
-
-                if segredo == "SIM":
-
-                    adicionar_texto(
-                        slide,
-                        "SEGREDO DE JUSTIÇA",
-                        0,
-                        Inches(5.3),
-                        largura_slide,
-                        40,
-                        RGBColor(255,0,0)
-                    )
+                adicionar_texto(
+                    slide,
+                    "SEGREDO DE JUSTIÇA",
+                    0,
+                    Inches(5.3),
+                    largura_slide,
+                    40,
+                    RGBColor(255,0,0)
+                )
 
             progress.progress((i+1)/total)
 
-        # manter slide inicial
-        slides_gerados = len(df)
+        slides_gerados = len(df_editado)
 
         while len(prs.slides) > slides_gerados + 1:
             prs.slides._sldIdLst.remove(prs.slides._sldIdLst[1])
@@ -233,11 +261,10 @@ if arquivo:
         output = BytesIO()
         prs.save(output)
 
-        st.success("Apresentação gerada!")
+        st.success("Slides gerados!")
 
         st.download_button(
-            label="Baixar PowerPoint",
-            data=output.getvalue(),
-            file_name="slides_pauta.pptx",
-            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            "Baixar PowerPoint",
+            output.getvalue(),
+            file_name="slides_pauta.pptx"
         )

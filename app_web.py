@@ -8,19 +8,74 @@ from io import BytesIO
 import os
 
 st.set_page_config(
-    page_title="Gerador de Slides para pauta",
+    page_title="Gerador de Slides da Pauta",
     layout="centered"
 )
 
-st.title("Gerador de Slides para pauta da 2ª Turma Cível")
-st.write("Envie a planilha Excel para gerar os slides automaticamente")
+st.title("Gerador de Slides da Pauta")
+
+# =====================================
+# CONFIGURAÇÕES EDITÁVEIS
+# =====================================
+
+st.subheader("Configurações")
+
+turma = st.text_input(
+    "Nome da Turma",
+    value="2ª Turma Cível"
+)
+
+st.write("### Substituições de nomes")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    nome1 = st.text_input(
+        "JOAO EGMONT LEONCIO LOPES",
+        value="JOÃO EGMONT"
+    )
+
+    nome2 = st.text_input(
+        "HECTOR VALVERDE SANTANNA",
+        value="HÉCTOR VALVERDE"
+    )
+
+with col2:
+    nome3 = st.text_input(
+        "RENATO RODOVALHO SCUSSEL",
+        value="RENATO SCUSSEL"
+    )
+
+    nome4 = st.text_input(
+        "FERNANDO ANTÔNIO TAVERNARD LIMA",
+        value="FERNANDO TAVERNARD"
+    )
+
+    nome5 = st.text_input(
+        "ALVARO CIARLINI",
+        value="ALVARO CIARLINI"
+    )
+
+substituicoes = {
+    "JOAO EGMONT LEONCIO LOPES": nome1,
+    "HECTOR VALVERDE SANTANNA": nome2,
+    "RENATO RODOVALHO SCUSSEL": nome3,
+    "FERNANDO ANTÔNIO TAVERNARD LIMA": nome4,
+    "ALVARO CIARLINI": nome5
+}
+
+st.divider()
+
+# =====================================
+# UPLOAD
+# =====================================
 
 arquivo = st.file_uploader("Enviar Excel", type=["xlsx"])
 
 
-# ================================
-# Função para adicionar texto
-# ================================
+# =====================================
+# FUNÇÃO TEXTO
+# =====================================
 
 def adicionar_texto(slide, texto, x, y, largura, tamanho, cor):
 
@@ -41,16 +96,16 @@ def adicionar_texto(slide, texto, x, y, largura, tamanho, cor):
     run.font.color.rgb = cor
 
 
-# ================================
-# Processar Excel
-# ================================
+# =====================================
+# PROCESSAR EXCEL
+# =====================================
 
 if arquivo:
 
     df = pd.read_excel(arquivo)
     df.columns = df.columns.str.strip().str.lower()
 
-    st.success("Excel carregado com sucesso")
+    st.success("Excel carregado")
 
     st.subheader("Pré-visualização da planilha")
     st.dataframe(df)
@@ -59,7 +114,7 @@ if arquivo:
 
     if not colunas_necessarias.issubset(df.columns):
 
-        st.error("A planilha precisa ter as colunas: numero, processo, desembargador")
+        st.error("A planilha precisa ter: numero, processo, desembargador")
         st.stop()
 
     if st.button("Gerar apresentação"):
@@ -69,13 +124,6 @@ if arquivo:
             st.stop()
 
         progress = st.progress(0)
-
-        substituicoes = {
-            "JOAO EGMONT LEONCIO LOPES": "JOÃO EGMONT",
-            "HECTOR VALVERDE SANTANNA": "HÉCTOR VALVERDE",
-            "RENATO RODOVALHO SCUSSEL": "RENATO SCUSSEL",
-            "FERNANDO ANTÔNIO TAVERNARD LIMA": "FERNANDO TAVERNARD"
-        }
 
         prs = Presentation("modelo.pptx")
 
@@ -93,10 +141,6 @@ if arquivo:
 
         total = len(df)
 
-        # ================================
-        # GERAR SLIDES
-        # ================================
-
         for i, row in df.iterrows():
 
             slide = prs.slides.add_slide(layout)
@@ -113,9 +157,10 @@ if arquivo:
                     img_ref.height
                 )
 
+            # Nome da turma
             adicionar_texto(
                 slide,
-                "2ª Turma Cível",
+                turma,
                 Inches(3.5),
                 Inches(1.15),
                 Inches(4),
@@ -123,6 +168,7 @@ if arquivo:
                 RGBColor(255,255,255)
             )
 
+            # Processo
             proc = str(row["processo"]).split(".8")[0]
 
             num = str(row["numero"]).replace(".0","").strip()
@@ -139,6 +185,7 @@ if arquivo:
                 RGBColor(0,0,0)
             )
 
+            # Relator
             nome_original = str(row["desembargador"]).upper().strip()
 
             nome = substituicoes.get(nome_original, nome_original)
@@ -155,25 +202,38 @@ if arquivo:
                 RGBColor(0,0,0)
             )
 
+            # =====================================
+            # SEGREDO DE JUSTIÇA
+            # =====================================
+
+            if "segredo" in df.columns:
+
+                segredo = str(row["segredo"]).upper().strip()
+
+                if segredo == "SIM":
+
+                    adicionar_texto(
+                        slide,
+                        "SEGREDO DE JUSTIÇA",
+                        0,
+                        Inches(5.3),
+                        largura_slide,
+                        40,
+                        RGBColor(255,0,0)
+                    )
+
             progress.progress((i+1)/total)
 
-        # ================================
-        # REMOVER APENAS SLIDE MODELO
-        # ================================
-
+        # manter slide inicial
         slides_gerados = len(df)
 
         while len(prs.slides) > slides_gerados + 1:
             prs.slides._sldIdLst.remove(prs.slides._sldIdLst[1])
 
-        # ================================
-        # SALVAR
-        # ================================
-
         output = BytesIO()
         prs.save(output)
 
-        st.success("Apresentação gerada com sucesso!")
+        st.success("Apresentação gerada!")
 
         st.download_button(
             label="Baixar PowerPoint",
